@@ -1,0 +1,2 @@
+sqlite3 /path/to/sqlite_db.sqlite .dump > /path/to/sqlite_db.sql
+mysql -u username -p -h hostname database_name < /path/to/sqlite_db.sql
