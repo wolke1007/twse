@@ -37,14 +37,24 @@ def get_symbols():
     return symbols
 
 
-def gen_calendar():
+def gen_calendar(from_date: str):
     '''
     產生日期表
     '''
     this_year = datetime.datetime.now()
-    years = range(2010, this_year.year + 1)  # Fugle提供的資料從2010年
-    begin = [int(str(y) + '0101') for y in years]
-    end = [int(str(y) + '1231') for y in years]
+    last_data_year, last_data_month, last_data_day = [int(_) for _ in from_date.split('-')]
+    years = range(last_data_year, this_year.year + 1)  # Fugle提供的資料從2010年
+    if this_year.month < 10:
+        this_month = '0' + str(this_year.month)
+    else:
+        this_month = str(this_year.month)
+    if this_year.day < 10:
+        this_day = '0' + str(this_year.day)
+    else:
+        this_day = str(this_year.day)
+
+    begin = [int(str(y) + f'{last_data_month}{last_data_day}') for y in years]
+    end = [int(str(y) + f'{this_month}{this_day}') for y in years]
     calendar = pd.DataFrame({'begin': begin,
                              'end': end})
     calendar['begin'] = pd.to_datetime(calendar['begin'], format='%Y%m%d')
@@ -53,13 +63,16 @@ def gen_calendar():
     return calendar
 
 
-def get_hist_data(symbols: list):
+def get_latest_date(symbol):
+    sql_command = f"SELECT MAX(stocks.date) AS max_date FROM stocks WHERE symbol='{symbol}';"
+    result = cursor.execute(sql_command).fetchone()
+    return result[0] if result else None
+
+
+def get_hist_data(symbols: list, calendar):
     '''
     透過富果Fugle API抓取歷史資料
     '''
-    if len(symbols) == 0:
-        symbols = get_symbols()
-    calendar = gen_calendar()
     result = pd.DataFrame()
     for i in range(len(symbols)):
         cur_symbol = symbols[i]
@@ -116,8 +129,9 @@ def write_db(_data):
     conn.close()
 
 
-# 全部股票歷史資料
-# data = get_hist_data()
-# 單一個股歷史資料 - 2330台積電
-data = get_hist_data(symbols=[])
+date = get_latest_date(symbol='2002')
+calendar = gen_calendar(from_date=date)
+symbols = get_symbols()  # 取得全部股票號碼
+data = get_hist_data(symbols=symbols, calendar=calendar)
+# data = get_hist_data(symbols=['2002'], calendar=calendar)  # 單筆 debug 用
 write_db(data)
