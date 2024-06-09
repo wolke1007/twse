@@ -4,6 +4,7 @@ import sqlite3
 import requests
 import pandas as pd
 import datetime
+import asyncio
 
 # 建立資料表
 '''CREATE TABLE stocks (
@@ -25,6 +26,8 @@ import datetime
 # 連線 SQLite 資料庫
 conn = sqlite3.connect('stock.db')
 cursor = conn.cursor()
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 
 
 def get_symbols():
@@ -69,7 +72,7 @@ def get_latest_date(symbol):
     return result[0] if result else None
 
 
-def get_hist_data(symbols: list, calendar):
+async def get_hist_data(symbols: list, calendar):
     '''
     透過富果Fugle API抓取歷史資料
     '''
@@ -82,7 +85,7 @@ def get_hist_data(symbols: list, calendar):
             cur_end = calendar.loc[j, 'end']
             # 透過富果Fugle API抓取歷史資料
             data_link = f'https://api.fugle.tw/marketdata/v0.3/candles?symbolId=2884&apiToken=demo&from={cur_begin}&to={cur_end}&fields=open,high,low,close,volume,turnover,change'
-            resp = requests.get(url=data_link)
+            resp = await loop.run_in_executor(None, requests.get, data_link)
             stock_detail = resp.json()
             data_by_date = stock_detail.pop('data')
             for data in data_by_date:
@@ -132,6 +135,9 @@ def write_db(_data):
 date = get_latest_date(symbol='2002')
 calendar = gen_calendar(from_date=date)
 symbols = get_symbols()  # 取得全部股票號碼
-data = get_hist_data(symbols=symbols, calendar=calendar)
+# get_hist_data(symbols=symbols, calendar=calendar)
 # data = get_hist_data(symbols=['2002'], calendar=calendar)  # 單筆 debug 用
-write_db(data)
+task = loop.create_task(get_hist_data(symbols=symbols, calendar=calendar))
+data = asyncio.gather(task)
+# write_db(data)
+# print('write db job done!')
