@@ -88,6 +88,7 @@ def get_history_data_write_to_db(stock_code_list: list, api_period: str = "max")
     # 迭代股票代码列表
     for stock_code in stock_code_list:
         try:
+            stock_code = stock_code.strip()
             stock_id = f"{stock_code}.TW"
             data = yf.Ticker(stock_id)
             df = data.history(period=api_period)
@@ -125,8 +126,7 @@ def get_history_data_write_to_db(stock_code_list: list, api_period: str = "max")
 
             # 检查DataFrame是否为空，如果为空则跳过此次循环
             if df.empty:
-                print(f"No data found for stock code {stock_code}")
-                continue
+                raise ValueError(f"No data found for stock code {stock_code}")
 
             # 将数据写入数据库表中，插入时忽略已经存在的记录
             temp_table_name = 'temp_historical_data'
@@ -153,23 +153,33 @@ def get_history_data_write_to_db(stock_code_list: list, api_period: str = "max")
 
                 # 提交事务
                 conn.commit()
-
                 # 打印成功消息
                 print(f"Successfully inserted {num_inserted} records for stock code {stock_code}")
-
             finally:
                 # 关闭连接
                 conn.close()
-            # 避免太快
-            time.sleep(1)
         except Exception as e:
             print(f'e: {e}, stock_code: {stock_code}')
             fail_list.append(stock_code)
-            continue
+        finally:
+            # 避免太快
+            time.sleep(1)
     return fail_list
 
 
 if __name__ == "__main__":
+
     stock_code_list = get_stock_list()
-    fail_list = get_history_data_write_to_db(stock_code_list, "5d")
+    api_parameter = "5d"
+    fail_list = get_history_data_write_to_db(stock_code_list, api_parameter)
     print(f'all failed case: {fail_list}')
+    if fail_list:
+        retry = 3
+        while retry:
+            fail_list = get_history_data_write_to_db(fail_list, api_parameter)
+            if fail_list:
+                print(f'all failed case: {fail_list}')
+                retry -= 1
+                print(f'retry remain: {retry}')
+            else:
+                break

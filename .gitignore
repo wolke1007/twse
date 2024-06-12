@@ -2,3 +2,4 @@
 /.idea/
 stock.db
 config.py
+*.pyc
